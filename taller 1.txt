@@ -1,0 +1,21 @@
+-- Punto 2
+     -- 2a
+     CREATE TABLESPACE avianca DATAFILE 'avianca.dat' SIZE 2G ONLINE;
+
+    -- 2b
+    CREATE UNDO TABLESPACE undoavianca
+        DATAFILE 'undoavianca_1a.dat'
+        SIZE 25M AUTOEXTEND ON
+        RETENTION GUARANTEE
+        
+-- Punto 3
+ALTER SYSTEM SET UNDO_TABLESPACE = undoavianca;
+
+
+-- Punto 4
+CREATE USER usravianca
+IDENTIFIED BY usravianca
+DEFAULT TABLESPACE avianca
+QUOTA UNLIMITED ON avianca;
+
+GRANT CREATE SESSION, DBA TO usravianca
