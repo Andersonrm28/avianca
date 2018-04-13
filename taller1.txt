@@ -1,4 +1,6 @@
-﻿
+﻿-- punto 10 Link Video
+-- https://mega.nz/#!Y3wjxZrA!VX4ETxjMeWoGFYKQKc7b65LENcJUQEQIDhTj-LgSpII 
+
 -- Punto 2
      -- 2a
      CREATE TABLESPACE avianca DATAFILE 'avianca.dat' SIZE 2G ONLINE;
