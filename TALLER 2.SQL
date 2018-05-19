@@ -32,37 +32,23 @@ ALTER TABLE PROGRAMACIONES
  
 CREATE OR REPLACE VIEW AERONAVE_DISPONIBLE AS
     --Selecciono El Id de la aeronave, y la ciudad en que sale la aeronave, estos datos me sirven para posteriormente invocar esta vista
-    SELECT A.ID AS AERONAVE_ID, C.ID AS CIUDAD_ID FROM AERONAVES A
+    SELECT A.ID AS AERONAVE_ID, C.ID AS CIUDAD_ID,  R.AEROPUERTO_DESTINO_ID AS AEROPUERTO_ID , P.Hora_Estimada_Llegada
+        FROM AERONAVES A
         INNER JOIN PROGRAMACIONES P ON A.ID = P.AERONAVE_ID
         INNER JOIN VUELOS V ON V.ID = P.VUELO_ID
         INNER JOIN RUTAS R ON R.ID = V.Rutas_Id
         INNER JOIN AEROPUERTOS AP ON R.Aeropuerto_Destino_Id = AP.ID
         INNER JOIN CIUDADES C ON C.ID = AP.CIUDAD_ID
-        WHERE R.AEROPUERTO_DESTINO_ID = (
-                        --Este subquery busca el aeropuerto de origen de la primera programacion que encuentre que no tenga avion asignado
-                        --que su Aeronave_id sea Null, osea la programación de vuelo que vamos a programar
-                        SELECT AE.ID FROM AEROPUERTOS AE 
-                        INNER JOIN RUTAS RU ON AE.ID = RU.AEROPUERTO_ORIGEN_ID
-                        INNER JOIN VUELOS VL ON RU.ID = VL.RUTAS_ID
-                        INNER JOIN PROGRAMACIONES PG ON PG.VUELO_ID = VL.ID
-                        WHERE ROWNUM = 1 AND Pg.Aeronave_Id IS NULL)
-        -- Hago la resta de horas de estimada de llegada de otros vuelos a ese aeropuerto, con la estimada de salida de vuelo que estoy programando
-        -- y traigo todos los registros de los aviones que llegen 2 horas antes
-        AND CAST(P.Hora_Estimada_Llegada AS TIME) - CAST((
-                        --Este subquery busca la hora estimada de salida de la primera programacion que encuentre que no tenga avion asignado
-                        --que su Aeronave_id sea Null, osea programación de vuelo que vamos a programar
-                        SELECT Pg.Hora_Estimada_Salida FROM PROGRAMACIONES PG
-                        WHERE  ROWNUM = 1 AND Pg.Aeronave_Id IS NULL) AS TIME) < '-00 02:00:00.0000000'
-       --Limito la busqueda de aviones que cumplan las condiciones al primero encontrado por simplicidad del ejercicio como dice en el taller
-       AND ROWNUM = 1
-       ORDER BY P.ID ASC;
+        ORDER BY P.ID ASC;
 
 
 -- Punto 2
 CREATE OR REPLACE PROCEDURE ASIGNAR_TRIPULACION IS
     V_AERONAVE_ID NUMBER;
     PROGRAMACION_ID NUMBER;
-    CIUDAD_ID NUMBER;
+    ID_CIUDAD NUMBER;
+    ID_AEROPUERTO NUMBER;
+    HORA_ESTIMADA_SALIDA_VUELO TIMESTAMP;
     EMPLEADO_ID_PILOTO NUMBER;
     EMPLEADO_ID_AUXILIAR NUMBER;
     CARGO VARCHAR(255);
@@ -76,7 +62,7 @@ CREATE OR REPLACE PROCEDURE ASIGNAR_TRIPULACION IS
                         INNER JOIN PILOTOS P ON (E.ID = P.EMPLEADO_ID)
                         WHERE E.HORAS_DESCANSO_ULTIMO_VUELO <= 2 
                           AND ESTADO = 'Activo' 
-                          AND UBICACION_ACTUAL_ID = CIUDAD_ID
+                          AND UBICACION_ACTUAL_ID = ID_CIUDAD
                           AND ROWNUM <= 2;  
     NUMERO_AUXILIARES NUMBER;
     
@@ -87,19 +73,28 @@ CREATE OR REPLACE PROCEDURE ASIGNAR_TRIPULACION IS
                     FROM EMPLEADOS
                     WHERE HORAS_DESCANSO_ULTIMO_VUELO <= 2 
                       AND ESTADO = 'Activo' 
-                      AND UBICACION_ACTUAL_ID = 165
+                      AND UBICACION_ACTUAL_ID = ID_CIUDAD
                       AND CARGO = 'Auxiliar'
                       AND ROWNUM <= NUMERO_AUXILIARES;  
   BEGIN     
     
-    --invoco la vista para saber la aeronave disponible y guardo el resultado en variables locales
-    SELECT AERONAVE_ID, CIUDAD_ID INTO V_AERONAVE_ID, CIUDAD_ID FROM AERONAVE_DISPONIBLE;
-    
     --traigo el ID de la programacion que voy a programar para esto debe ser un ID que no tenga aeronave asignada, limito el query a un registro
-    SELECT ID INTO PROGRAMACION_ID FROM PROGRAMACIONES
-    WHERE AERONAVE_ID IS NULL
-      AND ROWNUM = 1
-    ORDER BY ID ASC;
+     SELECT PG.ID, AE.ID, PG.HORA_ESTIMADA_SALIDA 
+       INTO PROGRAMACION_ID, ID_AEROPUERTO, HORA_ESTIMADA_SALIDA_VUELO
+            FROM AEROPUERTOS AE 
+            INNER JOIN RUTAS RU ON AE.ID = RU.AEROPUERTO_ORIGEN_ID
+            INNER JOIN VUELOS VL ON RU.ID = VL.RUTAS_ID
+            INNER JOIN PROGRAMACIONES PG ON PG.VUELO_ID = VL.ID
+            WHERE ROWNUM = 1 AND Pg.AERONAVE_ID IS NULL;
+
+    
+    --invoco la vista para saber la aeronave disponible y guardo el resultado en variables locales, 
+    --filtro por el aeropuerto de donde sale la programacion que esto programando, y por los vuelos que llegan a ese aeropuerto con mas de 2 horas de anticipacion
+    SELECT AERONAVE_ID, CIUDAD_ID INTO V_AERONAVE_ID, ID_CIUDAD FROM AERONAVE_DISPONIBLE
+    WHERE Aeropuerto_Id = ID_AEROPUERTO 
+      AND (Hora_Estimada_Llegada - HORA_ESTIMADA_SALIDA_VUELO)< '-00 02:00:00.0000000'
+      AND ROWNUM = 1;
+    
     
     --uso el cursor de pilotos para registrarlos como tripulacion de la programacion de vuelo
     OPEN C_PILOTOS;
@@ -169,7 +164,7 @@ CREATE OR REPLACE PROCEDURE ASIGNAR_TRIPULACION IS
     CLOSE C_AUXILIARES;
   
     
-    DBMS_OUTPUT.PUT_LINE('Programación ID:' || PROGRAMACION_ID || ', Ciudad de Salida ID: ' || CIUDAD_ID || ', Cantidad Horas de Vuelo: ' || CANTIDAD_HORAS_VUELO || ', Aeronave ID: ' || V_AERONAVE_ID || ', Numero de Sillas: ' || NUMERO_SILLAS || ', Cantidad de Auxiliares Programados: ' || NUMERO_AUXILIARES);
+    DBMS_OUTPUT.PUT_LINE('Programación ID:' || PROGRAMACION_ID || ', Ciudad de Salida ID: ' || ID_CIUDAD || ', Cantidad Horas de Vuelo: ' || CANTIDAD_HORAS_VUELO || ', Aeronave ID: ' || V_AERONAVE_ID || ', Numero de Sillas: ' || NUMERO_SILLAS || ', Cantidad de Auxiliares Programados: ' || NUMERO_AUXILIARES);
     
     --Actualizo el campo Aeronave_ID en la tabla de programaciones para indicar cual es el avion asignado y cambio el estado de programacion a 'Confirmado'
     UPDATE PROGRAMACIONES SET AERONAVE_ID = V_AERONAVE_ID , ESTADO_PROGRAMACION = 'Confirmado'
