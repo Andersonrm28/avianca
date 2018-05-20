@@ -337,3 +337,10 @@ WHERE ID BETWEEN 200400 AND 201800;
 
 UPDATE EMPLEADOS SET HORAS_DESCANSO_ULTIMO_VUELO = 3
 WHERE ID > 202000;
+
+
+---- Punto 7 videos - lecturas
+https://mega.nz/#!1y5QwQCb!WdmvcjGNwIh0PkBD5b7bgEc6v-fwI_1KbRe10F3MmxA
+
+---- Punto 8 - video explicacion vistas procedimientos
+https://mega.nz/#!5jpgzQzJ!p8Fo8g5tNFhhrbfKx27H9Vqm6bUBcmTZHTMjbToN6gs
